@@ -25,7 +25,7 @@ Examples uri:
 
 * `mongodb://User:Pwd@ip.ip.ip.ip:port`
 
-After successfull ru of the `monalize` tool, all the output artifacts will be saved in working directory:
+After successfull run of the `monalize` tool, all the output artifacts will be saved in working directory:
 
 * `colout.txt` COLLSCAN logs.
 * `result.csv` optional excel file.
