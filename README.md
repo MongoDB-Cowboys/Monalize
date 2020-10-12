@@ -1,26 +1,31 @@
-# Monalize v1.1.0
+# Monalize tool overview 
 
-Monaliza is an application for scanning and analyzing Mongodb databases. The main task is fast output Names of all databases and collections, indexes and slow queries.
-The usage is very simple, compile the binary if it is not compiled.
+Monaliza is a tool for scanning and analyzing MongoDB database for any performance issues, which lead to high CPU consumption. 
+
+The main task is a fast output of names of all databases and collections, indexes and slow queries stats.
+
+## Compilation
+
 `go build monalize.go`
 
-And run on any Unix like system ./monalize
+## Usage 
 
-Flags:
+Run on any Unix like system via `./monalize`
 
-* -db_name (optional) If you need scan only one database. (default: nil)
-* -db_uri (optional) Uri to connect to mongodb. (default: "mongodb://localhost:27017")
-* -excel (optional) Make output to excel file. (default: false)
-* -logpath (optional) Set path to log file. (default "/var/log/mongodb/mongodb.log")
+Available flags:
 
-Get little help `./monalize -h`.
+* -db_name (optional) If you need to scan only specific database. (default: nil)
+* -db_uri (optional) Uri to connect to mongodb service. (default: "mongodb://localhost:27017")
+* -excel (optional) To save an output of the script to excel file. (default: false)
+* -logpath (optional) Specify a path to MongoDB service log file. (default "/var/log/mongodb/mongodb.log")
+
+A help is available via `./monalize -h`.
 
 Examples uri: 
 
 * `mongodb://User:Pwd@ip.ip.ip.ip:port`
 
-After successfully use all data files from `monalize` saves in working directory.
+After successfull ru of the `monalize` tool, all the output artifacts will be saved in working directory:
 
-This is:
 * `colout.txt` COLLSCAN logs.
 * `result.csv` optional excel file.
