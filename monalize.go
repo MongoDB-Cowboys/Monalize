@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -141,7 +142,16 @@ func DeleteFiles() {
 	_ = os.Remove("colout.txt")
 	fmt.Println("- Good bye!")
 }
+func jsonToStr(args string) string {       // function that edits and returns readable indexes
+	reg, err := regexp.Compile(`"`)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	res := strings.Replace(string(args), `{"$numberInt":`, "", -1)
+	result := reg.ReplaceAllString(res, "")
+	return strings.TrimSuffix(result, "}")
+}
 func main() {
 	data := [][]string{}
 	CloseHandler()
@@ -151,7 +161,7 @@ func main() {
 	flag.StringVar(&db_uri, "db_uri", "mongodb://localhost:27017", "Set custom url to connect to mongodb")
 	flag.StringVar(&db_name, "db_name", "", "Set target database, if nil then choose all databases")
 	flag.StringVar(&logpath, "logpath", "/var/log/mongodb/mongodb.log", "Set path to log file")
-	boolPtr := flag.Bool("excel", false, "Add this flag if you want to put the results in an Excel file")
+	boolExcel := flag.Bool("excel", false, "Add this flag if you want to put the results in an Excel file")
 	flag.Parse()
 	client, err := mongo.NewClient(options.Client().ApplyURI(db_uri))
 	if err != nil {
@@ -189,19 +199,15 @@ func main() {
 			count, err := client.Database(db_name).Collection(z).CountDocuments(context.Background(), bson.D{})
 			cnt := int(count)
 
-			str_cnt := strconv.Itoa(cnt)
+			str_cnt := strconv.Itoa(cnt) // convert int to str
 			fmt.Println(Collections("--- Collection: ", z, " Count: ", cnt))
 
 			for cur.Next(context.Background()) {
-				inbsonD := bson.D{}
-				cur.Decode(&inbsonD)
-				fmt.Println(Index(inbsonD[1]))
-
-				if z == currentcoll {
+				if z == currentcoll { // create for disable duplicate in excell
 					z = " "
 				}
 
-				currentcoll = z
+				currentcoll = z // create for disable duplicate in excell
 
 				index := (&bsonDocument)
 				err := cur.Decode(&index)
@@ -209,33 +215,21 @@ func main() {
 				temporaryBytes, err = bson.MarshalExtJSON(bsonDocument, true, true)
 				err = json.Unmarshal(temporaryBytes, &jsonDocument)
 				var jsonKey map[string]interface{} = jsonDocument["key"].(map[string]interface{})
-				if *boolPtr == true {
+				args, _ := json.Marshal(jsonKey)   // marshal map[string]interface{} to str
+				fmt.Println(Index(jsonToStr(string(args))))
+				if *boolExcel == true {
 
-					for k, v := range jsonKey {
-						value, ok := v.(map[string]interface{})
-
-						if str_cnt == currentcnt {
-							str_cnt = " "
-						}
-
-						currentcnt = str_cnt
-						if dbs == currentdb {
-							dbs = " "
-						}
-						currentdb = dbs
-						if ok {
-							for _, val := range value {
-								var logStr string = "" + k + ":" + val.(string)
-								data = append(data, []string{dbs, currentcoll, str_cnt, logStr})
-
-							}
-						} else {
-							var logStr string = "" + k + ":" + v.(string)
-							data = append(data, []string{dbs, currentcoll, str_cnt, logStr})
-
-						}
-
+					if str_cnt == currentcnt { // create for disable duplicate in excell
+						str_cnt = " "
 					}
+					currentcnt = str_cnt // create for disable duplicate in excell
+					if dbs == currentdb { // create for disable duplicate in excell
+						dbs = " "
+					}
+					currentdb = dbs // create for disable duplicate in excell
+
+					logStr := jsonToStr(string(args))
+					data = append(data, []string{dbs, currentcoll, str_cnt, logStr}) // append to csv
 				}
 				_ = err
 
@@ -273,14 +267,11 @@ func main() {
 				count, err := client.Database(s).Collection(z).CountDocuments(context.Background(), bson.D{})
 				cnt := int(count)
 
-				str_cnt := strconv.Itoa(cnt)
+				str_cnt := strconv.Itoa(cnt) // convert int to str
 
 				fmt.Println(Collections("--- Collection: ", z, " Count: ", cnt))
 
 				for cur.Next(context.Background()) {
-					inbsonD := bson.D{}
-					cur.Decode(&inbsonD)
-					fmt.Println(Index(inbsonD[1]))
 					index := (&bsonDocument)
 					err := cur.Decode(&index)
 					var jsonDocument map[string]interface{}
@@ -288,37 +279,27 @@ func main() {
 					err = json.Unmarshal(temporaryBytes, &jsonDocument)
 					var jsonKey map[string]interface{} = jsonDocument["key"].(map[string]interface{})
 
-					if z == currentcoll {
+					args, _ := json.Marshal(jsonKey) // marshal map[string]interface{} to str
+					fmt.Println(Index(jsonToStr(string(args))))
+
+					if z == currentcoll { // create for disable duplicate in excell
 						z = " "
 					}
+					currentcoll = z // create for disable duplicate in excell
+					if *boolExcel == true {
 
-					currentcoll = z
-					if *boolPtr == true {
-						for k, v := range jsonKey {
-							value, ok := v.(map[string]interface{})
-
-							if str_cnt == currentcnt {
-								str_cnt = " "
-							}
-
-							currentcnt = str_cnt
-							if dbs == currentdb {
-								dbs = " "
-							}
-							currentdb = dbs
-							if ok {
-								for _, val := range value {
-									var logStr string = "" + k + ":" + val.(string)
-									data = append(data, []string{dbs, currentcoll, str_cnt, logStr})
-
-								}
-							} else {
-								var logStr string = "" + k + ":" + v.(string)
-								data = append(data, []string{dbs, currentcoll, str_cnt, logStr})
-
-							}
-
+						if str_cnt == currentcnt { // create for disable duplicate in excell
+							str_cnt = " "
 						}
+						currentcnt = str_cnt // create for disable duplicate in excell
+						if dbs == currentdb { // create for disable duplicate in excell
+							dbs = " "
+						}
+						currentdb = dbs // create for disable duplicate in excell
+
+						logStr := jsonToStr(string(args))
+						data = append(data, []string{dbs, currentcoll, str_cnt, logStr}) // append to csv
+
 					}
 					_ = err
 				}
@@ -326,7 +307,7 @@ func main() {
 			}
 		}
 	}
-	if *boolPtr == true {
+	if *boolExcel == true {
 		if err := tocsvExport(data); err != nil { // this code return data to csv
 			log.Fatal(err)
 		}

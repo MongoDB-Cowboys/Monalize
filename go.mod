@@ -1,4 +1,4 @@
-module github.com/ku9nov/analitics
+module github.com/MongoDB-Cowboys/Monalize
 
 go 1.13
 
