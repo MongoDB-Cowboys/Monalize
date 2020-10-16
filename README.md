@@ -29,3 +29,7 @@ After successfull run of the `monalize` tool, all the output artifacts will be s
 
 * `colout.txt` COLLSCAN logs.
 * `result.csv` optional excel file.
+
+## License 
+
+GPL-3.0 License
