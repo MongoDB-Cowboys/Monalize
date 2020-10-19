@@ -10,7 +10,9 @@ The main task is a fast output of names of all databases and collections, indexe
 
 ## Usage 
 
-Run on any Unix like system via `./monalize`
+Compile the tool from src code or install via `wget https://github.com/MongoDB-Cowboys/Monalize/releases/latest`
+
+Then you can run on any Unix like system via `./monalize`
 
 Available flags:
 
