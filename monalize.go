@@ -142,14 +142,15 @@ func DeleteFiles() {
 	_ = os.Remove("colout.txt")
 	fmt.Println("- Good bye!")
 }
-func jsonToStr(args string) string {       // function that edits and returns readable indexes
+func jsonToStr(args string) string { // function that edits and returns readable indexes
 	reg, err := regexp.Compile(`"`)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	res := strings.Replace(string(args), `{"$numberInt":`, "", -1)
-	result := reg.ReplaceAllString(res, "")
+	intres := strings.Replace(string(args), `{"$numberInt":`, "", -1)
+	floatres := strings.Replace(string(intres), `{"$numberDouble":`, "", -1)
+	result := reg.ReplaceAllString(floatres, "")
 	return strings.TrimSuffix(result, "}")
 }
 func main() {
@@ -215,14 +216,14 @@ func main() {
 				temporaryBytes, err = bson.MarshalExtJSON(bsonDocument, true, true)
 				err = json.Unmarshal(temporaryBytes, &jsonDocument)
 				var jsonKey map[string]interface{} = jsonDocument["key"].(map[string]interface{})
-				args, _ := json.Marshal(jsonKey)   // marshal map[string]interface{} to str
+				args, _ := json.Marshal(jsonKey) // marshal map[string]interface{} to str
 				fmt.Println(Index(jsonToStr(string(args))))
 				if *boolExcel == true {
 
 					if str_cnt == currentcnt { // create for disable duplicate in excell
 						str_cnt = " "
 					}
-					currentcnt = str_cnt // create for disable duplicate in excell
+					currentcnt = str_cnt  // create for disable duplicate in excell
 					if dbs == currentdb { // create for disable duplicate in excell
 						dbs = " "
 					}
@@ -291,7 +292,7 @@ func main() {
 						if str_cnt == currentcnt { // create for disable duplicate in excell
 							str_cnt = " "
 						}
-						currentcnt = str_cnt // create for disable duplicate in excell
+						currentcnt = str_cnt  // create for disable duplicate in excell
 						if dbs == currentdb { // create for disable duplicate in excell
 							dbs = " "
 						}
