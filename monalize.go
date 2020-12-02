@@ -71,7 +71,7 @@ func Color(colorString string) func(...interface{}) string {
 
 func currentlog(db_uri, logpath string) { // func make log files with slow queries and send files to ftp server. Clear history.
 	fmt.Println(Info("Search slow query..."))
-	err, out, errout := Shellout("mongo " + db_uri + " --eval " + `'db.currentOp({"secs_running": {$gte: 1}})'`)
+	err, out, errout := Shellout("mongo '" + db_uri + "' --eval " + `'db.currentOp({"secs_running": {$gte: 1}})'`)
 	if err != nil {
 		log.Printf("error: %v\n", err)
 	}
