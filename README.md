@@ -34,6 +34,10 @@ Examples uri:
 
 * `mongodb://User:Pwd@ip.ip.ip.ip:port`
 
+Full request example:
+
+* `monalize --db_uri "mongodb://user:passwd@127.0.0.1:27017/?&authSource=admin"`
+
 After successfull run of the `monalize` tool, all the output artifacts will be saved in working directory:
 
 * `colout.txt` COLLSCAN logs.
