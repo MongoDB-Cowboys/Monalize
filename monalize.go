@@ -159,16 +159,20 @@ func main() {
 	var db_uri string
 	var db_name string
 	var logpath string
+	var context_timeout int
+
 	flag.StringVar(&db_uri, "db_uri", "mongodb://localhost:27017", "Set custom url to connect to mongodb")
 	flag.StringVar(&db_name, "db_name", "", "Set target database, if nil then choose all databases")
 	flag.StringVar(&logpath, "logpath", "/var/log/mongodb/mongodb.log", "Set path to log file")
+	flag.IntVar(&context_timeout, "context_timeout", 10, "Set context timeout")
+
 	boolExcel := flag.Bool("excel", false, "Add this flag if you want to put the results in an Excel file")
 	flag.Parse()
 	client, err := mongo.NewClient(options.Client().ApplyURI(db_uri))
 	if err != nil {
 		log.Fatal(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(context_timeout) * time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
