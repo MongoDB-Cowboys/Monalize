@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -30,6 +31,17 @@ var jsonDocument map[string]interface{}
 var temporaryBytes []byte
 
 const ShellToUse = "bash"
+
+func (ci *CollectionInfo) IsView() bool {
+	return ci.Type == "view"
+}
+
+type CollectionInfo struct {
+	Name    string `bson:"name"`
+	Type    string `bson:"type"`
+	Options bson.M `bson:"options"`
+	Info    bson.M `bson:"info"`
+}
 
 func Shellout(command string) (error, string, string) {
 	var stdout bytes.Buffer
@@ -153,6 +165,45 @@ func jsonToStr(args string) string { // function that edits and returns readable
 	result := reg.ReplaceAllString(floatres, "")
 	return strings.TrimSuffix(result, "}")
 }
+func GetCollections(database *mongo.Database, name string) (*mongo.Cursor, error) {
+	filter := bson.D{}
+	if len(name) > 0 {
+		filter = append(filter, primitive.E{"name", name})
+	}
+
+	cursor, err := database.ListCollections(nil, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return cursor, nil
+}
+func GetCollectionInfo(coll *mongo.Collection) (*CollectionInfo, error) {
+	iter, err := GetCollections(coll.Database(), coll.Name())
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close(context.Background())
+	comparisonName := coll.Name()
+
+	var foundCollInfo *CollectionInfo
+	for iter.Next(nil) {
+		collInfo := &CollectionInfo{}
+		err = iter.Decode(collInfo)
+		if err != nil {
+			return nil, err
+		}
+		if collInfo.Name == comparisonName {
+			foundCollInfo = collInfo
+			break
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+	return foundCollInfo, nil
+}
+
 func main() {
 	data := [][]string{}
 	CloseHandler()
@@ -172,7 +223,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), time.Duration(context_timeout) * time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(context_timeout)*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
@@ -199,7 +250,18 @@ func main() {
 			batchSize := int32(10)
 			cur, err := c.Indexes().List(context.Background(), &options.ListIndexesOptions{&batchSize, &duration})
 			if err != nil {
-				log.Fatalf("Something went wrong listing %v", err)
+				isView := true
+				// failure to get CollectionInfo should not cause the function to exit. We only use this to
+				// determine if a collection is a view.
+				collInfo, err := GetCollectionInfo(c)
+				if collInfo != nil {
+					isView = collInfo.IsView()
+					_ = isView
+					continue
+				} else {
+					log.Fatalf("Something went wrong listing %v", err)
+				}
+
 			}
 			count, err := client.Database(db_name).Collection(z).CountDocuments(context.Background(), bson.D{})
 			cnt := int(count)
@@ -265,8 +327,20 @@ func main() {
 				batchSize := int32(10)
 
 				cur, err := c.Indexes().List(context.Background(), &options.ListIndexesOptions{&batchSize, &duration})
+
 				if err != nil {
-					log.Fatalf("Something went wrong listing %v", err)
+					isView := true
+					// failure to get CollectionInfo should not cause the function to exit. We only use this to
+					// determine if a collection is a view.
+					collInfo, err := GetCollectionInfo(c)
+					if collInfo != nil {
+						isView = collInfo.IsView()
+						_ = isView
+						continue
+					} else {
+						log.Fatalf("Something went wrong listing %v", err)
+					}
+
 				}
 
 				count, err := client.Database(s).Collection(z).CountDocuments(context.Background(), bson.D{})

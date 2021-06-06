@@ -27,6 +27,7 @@ Available flags:
 * --db_uri (optional) Uri to connect to mongodb service. (default: "mongodb://localhost:27017")
 * --excel (optional) To save an output of the script to excel file. (default: false)
 * --logpath (optional) Specify a path to MongoDB service log file. (default "/var/log/mongodb/mongodb.log")
+* --context_timeout(optional) Set context timeout. (default 10)
 
 A help is available via `./monalize --help`.
 
