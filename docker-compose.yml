@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+
+  mongo_tests:
+    platform: linux/x86_64
+    image: mongo:4.4
+    container_name: server_mongo_for_tests
+    restart: always
+    volumes:
+      - data-tests:/data/db
+    ports:
+      - "27017:27017"
+
+volumes:
+  data-tests:
