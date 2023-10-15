@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -30,8 +30,6 @@ var bsonDocument bson.D
 var jsonDocument map[string]interface{}
 var temporaryBytes []byte
 
-const ShellToUse = "bash"
-
 func (ci *CollectionInfo) IsView() bool {
 	return ci.Type == "view"
 }
@@ -41,16 +39,6 @@ type CollectionInfo struct {
 	Type    string `bson:"type"`
 	Options bson.M `bson:"options"`
 	Info    bson.M `bson:"info"`
-}
-
-func Shellout(command string) (error, string, string) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := exec.Command(ShellToUse, "-c", command)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return err, stdout.String(), stderr.String()
 }
 
 var (
@@ -81,37 +69,142 @@ func Color(colorString string) func(...interface{}) string {
 	return sprint
 }
 
-func currentlog(db_uri, logpath string) { // func make log files with slow queries and send files to ftp server. Clear history.
-	fmt.Println(Info("Search slow query..."))
-	err, out, errout := Shellout("mongo " + db_uri + " --eval " + `'db.currentOp({"secs_running": {$gte: 1}})'`)
+func writeToFile(filename, data string) error {
+	file, err := os.Create(filename)
 	if err != nil {
-		log.Printf("error: %v\n", err)
+		return err
 	}
-	fmt.Println("--- stdout ---")
-	fmt.Println(Current(out))
-	fmt.Println("--- stderr ---")
-	fmt.Println(errout)
-	fmt.Println(Info("Monitoring logs mongodb..."))
-	err, output, errout := Shellout("cat " + logpath + " | grep COLLSCAN > colout.txt")
-	if err != nil {
-		log.Printf("error: %v\n", err)
-	}
-	fmt.Println("--- stdout ---")
-	fmt.Println(COLLSCAN(output))
-	fmt.Println("--- stderr ---")
-	fmt.Println(errout)
-	err, history, errout := Shellout("history -c")
-	if err != nil {
-		log.Printf("error: %v\n", err)
-	}
-	fmt.Println(Index("History cleaned"))
-	fmt.Println(Index("Done"))
-	_ = history
+	defer file.Close()
 
+	_, err = file.WriteString(data)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func typeofobject(x interface{}) { //func to display type object
-	fmt.Sprintf("%T", x)
+func monitorLogs(logPath, containerName string) {
+	fmt.Println(Info("Monitoring logs mongodb..."))
+
+	var file *os.File
+	var err error
+	targetPath := "mongo_logs.txt"
+	if containerName != "" && logPath != "" {
+		fmt.Println(Info("Detected docker container usage with custom path to log file."))
+
+		cmd := exec.Command("docker", "exec", containerName, "cat", logPath)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("cmd.Run() failed with %s\n", err)
+		}
+
+		file, err = os.Create("mongo_logs.txt") // Set the file variable
+		if err != nil {
+			log.Fatalf("failed to create file: %s", err)
+		}
+		defer file.Close()
+
+		_, err = file.WriteString(string(output))
+		if err != nil {
+			log.Fatalf("error writing to file: %s", err)
+		}
+	} else if containerName != "" && logPath == "" {
+		fmt.Println(Info("Detected docker container usage with default stream logging."))
+
+		cmd := exec.Command("docker", "logs", containerName)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("cmd.Run() failed with %s\n", err)
+		}
+
+		file, err = os.Create("mongo_logs.txt") // Set the file variable
+		if err != nil {
+			log.Fatalf("failed to create file: %s", err)
+		}
+		defer file.Close()
+
+		_, err = file.WriteString(string(output))
+		if err != nil {
+			log.Fatalf("error writing to file: %s", err)
+		}
+
+	} else {
+		fmt.Println(Info("Detected default way with local mongodb log file."))
+		content, err := os.ReadFile(logPath)
+		if err != nil {
+			log.Fatalf("failed to read file: %s", err)
+		}
+
+		err = os.WriteFile(targetPath, content, 0644)
+		if err != nil {
+			log.Fatalf("failed to write to file: %s", err)
+		}
+	}
+
+	var collScanLines []string
+
+	content, err := os.ReadFile(targetPath) // Use the opened file for reading
+	if err != nil {
+		log.Fatalf("failed to read file: %s", err)
+	}
+
+	logs := string(content)
+
+	// Split the logs by newlines
+	logLines := strings.Split(logs, "\n")
+
+	for _, line := range logLines {
+		if strings.Contains(line, "COLLSCAN") {
+			collScanLines = append(collScanLines, line)
+		}
+	}
+
+	outputFilePath := "colout.txt"
+	fmt.Println(Info("Output file path: ", outputFilePath))
+
+	outputFile, err := os.Create(outputFilePath)
+	if err != nil {
+		log.Fatalf("failed to create output file: %s", err)
+	}
+	defer outputFile.Close()
+
+	writer := bufio.NewWriter(outputFile)
+	for _, line := range collScanLines {
+		fmt.Fprintln(writer, line)
+	}
+	if err := writer.Flush(); err != nil {
+		log.Fatalf("error while writing to file: %s", err)
+	}
+	err = os.Remove(targetPath)
+	if err != nil {
+		log.Fatalf("failed to remove file: %s", err)
+	}
+	fmt.Println(Info("--- Collscan Lines Written to ", outputFilePath, "---"))
+}
+
+func printCurrentInfo(client *mongo.Client) {
+	fmt.Println(Info("Search slow query..."))
+
+	result := bson.M{}
+	err := client.Database("admin").RunCommand(context.Background(), bson.D{{Key: "currentOp", Value: 1}, {Key: "secs_running", Value: bson.D{{Key: "$gte", Value: 1}}}}).Decode(&result)
+	if err != nil {
+		log.Printf("error while fetching slow queries: %v\n", err)
+	}
+	// Convert the result to a JSON string
+	jsonResult, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		log.Printf("error while marshalling result to JSON: %v\n", err)
+	}
+	if err == nil {
+		fmt.Println("--- stdout ---")
+		fmt.Println(Current(string(jsonResult)))
+	} else {
+		fmt.Println("--- stderr ---")
+		fmt.Println(err)
+	}
 }
 
 func arrgsToString(strArray []string) string { // func to convert to string
@@ -146,29 +239,29 @@ func CloseHandler() {
 	}()
 }
 
-// DeleteFiles is used to simulate a 'clean up' function to run on shutdown. Because
-// it's just an example it doesn't have any error handling.
+// DeleteFiles is used to simulate a 'clean up' function to run on shutdown.
+
 func DeleteFiles() {
 	fmt.Println("- Run Clean Up - Delete Our Files")
 	_ = os.Remove("result.csv")
 	_ = os.Remove("colout.txt")
 	fmt.Println("- Good bye!")
 }
-func jsonToStr(args string) string { // function that edits and returns readable indexes
-	reg, err := regexp.Compile(`"`)
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	intres := strings.Replace(string(args), `{"$numberInt":`, "", -1)
-	floatres := strings.Replace(string(intres), `{"$numberDouble":`, "", -1)
-	result := reg.ReplaceAllString(floatres, "")
-	return strings.TrimSuffix(result, "}")
+// function that edits and returns readable indexes
+func jsonToStr(args string) string {
+	args = strings.Replace(args, `{"$numberInt":`, "", -1)
+	args = strings.Replace(args, `{"$numberDouble":`, "", -1)
+	re := regexp.MustCompile(`"`)
+	args = re.ReplaceAllString(args, "")
+	args = strings.TrimSuffix(args, "}")
+
+	return args
 }
 func GetCollections(database *mongo.Database, name string) (*mongo.Cursor, error) {
 	filter := bson.D{}
 	if len(name) > 0 {
-		filter = append(filter, primitive.E{"name", name})
+		filter = append(filter, primitive.E{Key: "name", Value: name})
 	}
 
 	cursor, err := database.ListCollections(nil, filter)
@@ -204,51 +297,104 @@ func GetCollectionInfo(coll *mongo.Collection) (*CollectionInfo, error) {
 	return foundCollInfo, nil
 }
 
-func main() {
-	data := [][]string{}
-	CloseHandler()
-	var db_uri string
-	var db_name string
-	var logpath string
-	var context_timeout int
+var currentdb string   // *Current database name* create for disable duplicate in excell
+var currentcoll string // *Current collection name*  create for disable duplicate in excell
+var currentcnt string  // *Current Count docs in collection* create for disable duplicate in excell
+var data = [][]string{}
 
-	flag.StringVar(&db_uri, "db_uri", "mongodb://localhost:27017", "Set custom url to connect to mongodb")
-	flag.StringVar(&db_name, "db_name", "", "Set target database, if nil then choose all databases")
-	flag.StringVar(&logpath, "logpath", "/var/log/mongodb/mongodb.log", "Set path to log file")
-	flag.IntVar(&context_timeout, "context_timeout", 10, "Set context timeout")
-
-	boolExcel := flag.Bool("excel", false, "Add this flag if you want to put the results in an Excel file")
-	flag.Parse()
-	client, err := mongo.NewClient(options.Client().ApplyURI(db_uri))
+func processSingleDB(client *mongo.Client, ctx context.Context, dbName string, boolExcel *bool) {
+	col, err := client.Database(dbName).ListCollectionNames(ctx, bson.M{})
 	if err != nil {
 		log.Fatal(err)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), time.Duration(context_timeout)*time.Second)
-	err = client.Connect(ctx)
+	fmt.Println(Database("- Database: ", dbName))
+	var dbs string = dbName // create for disable duplicate in excell
+
+	for x, z := range col {
+		c := client.Database(dbName).Collection(z)
+		duration := 10 * time.Second
+		batchSize := int32(10)
+		cur, err := c.Indexes().List(context.Background(), &options.ListIndexesOptions{BatchSize: &batchSize, MaxTime: &duration})
+		if err != nil {
+			isView := true
+			// failure to get CollectionInfo should not cause the function to exit. We only use this to
+			// determine if a collection is a view.
+			collInfo, err := GetCollectionInfo(c)
+			if collInfo != nil {
+				isView = collInfo.IsView()
+				_ = isView
+				continue
+			} else {
+				log.Fatalf("Something went wrong listing %v", err)
+			}
+
+		}
+		count, err := client.Database(dbName).Collection(z).CountDocuments(context.Background(), bson.D{})
+		cnt := int(count)
+
+		str_cnt := strconv.Itoa(cnt) // convert int to str
+		fmt.Println(Collections("--- Collection: ", z, " Count: ", cnt))
+
+		for cur.Next(context.Background()) {
+			if z == currentcoll { // create for disable duplicate in excell
+				z = " "
+			}
+
+			currentcoll = z // create for disable duplicate in excell
+
+			index := (&bsonDocument)
+			err := cur.Decode(&index)
+			var jsonDocument map[string]interface{}
+			temporaryBytes, err = bson.MarshalExtJSON(bsonDocument, true, true)
+			err = json.Unmarshal(temporaryBytes, &jsonDocument)
+			var jsonKey map[string]interface{} = jsonDocument["key"].(map[string]interface{})
+			args, _ := json.Marshal(jsonKey) // marshal map[string]interface{} to str
+			fmt.Println(Index(jsonToStr(string(args))))
+			if *boolExcel == true {
+
+				if str_cnt == currentcnt { // create for disable duplicate in excell
+					str_cnt = " "
+				}
+				currentcnt = str_cnt  // create for disable duplicate in excell
+				if dbs == currentdb { // create for disable duplicate in excell
+					dbs = " "
+				}
+				currentdb = dbs // create for disable duplicate in excell
+
+				logStr := jsonToStr(string(args))
+				data = append(data, []string{dbs, currentcoll, str_cnt, logStr}) // append to csv
+			}
+			_ = err
+
+		}
+		_ = x
+	}
+}
+
+func processAllDBs(client *mongo.Client, ctx context.Context, boolExcel *bool) {
+	databases, err := client.ListDatabaseNames(ctx, bson.M{})
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer client.Disconnect(ctx)
-	err = client.Ping(ctx, readpref.Primary())
-	if err != nil {
-		log.Fatal("Connect to MongoDB is impossible. Check if it works and the entered data.")
-	}
-	var currentdb string   // *Current database name* create for disable duplicate in excell
-	var currentcoll string // *Current collection name*  create for disable duplicate in excell
-	var currentcnt string  // *Current Count docs in collection* create for disable duplicate in excell
-	if db_name != "" {
-		col, err := client.Database(db_name).ListCollectionNames(ctx, bson.M{})
+
+	for i, s := range databases {
+
+		col, err := client.Database(s).ListCollectionNames(ctx, bson.M{})
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(Database("- Database: ", db_name))
-		var dbs string = db_name // create for disable duplicate in excell
+
+		fmt.Println(Database(i, "- Database: ", s))
+		var dbs string = s // create for disable duplicate in excell
 
 		for x, z := range col {
-			c := client.Database(db_name).Collection(z)
+
+			c := client.Database(s).Collection(z)
 			duration := 10 * time.Second
 			batchSize := int32(10)
-			cur, err := c.Indexes().List(context.Background(), &options.ListIndexesOptions{&batchSize, &duration})
+
+			cur, err := c.Indexes().List(context.Background(), &options.ListIndexesOptions{BatchSize: &batchSize, MaxTime: &duration})
+
 			if err != nil {
 				isView := true
 				// failure to get CollectionInfo should not cause the function to exit. We only use this to
@@ -263,27 +409,29 @@ func main() {
 				}
 
 			}
-			count, err := client.Database(db_name).Collection(z).CountDocuments(context.Background(), bson.D{})
+
+			count, err := client.Database(s).Collection(z).CountDocuments(context.Background(), bson.D{})
 			cnt := int(count)
 
 			str_cnt := strconv.Itoa(cnt) // convert int to str
+
 			fmt.Println(Collections("--- Collection: ", z, " Count: ", cnt))
 
 			for cur.Next(context.Background()) {
-				if z == currentcoll { // create for disable duplicate in excell
-					z = " "
-				}
-
-				currentcoll = z // create for disable duplicate in excell
-
 				index := (&bsonDocument)
 				err := cur.Decode(&index)
 				var jsonDocument map[string]interface{}
 				temporaryBytes, err = bson.MarshalExtJSON(bsonDocument, true, true)
 				err = json.Unmarshal(temporaryBytes, &jsonDocument)
 				var jsonKey map[string]interface{} = jsonDocument["key"].(map[string]interface{})
+
 				args, _ := json.Marshal(jsonKey) // marshal map[string]interface{} to str
 				fmt.Println(Index(jsonToStr(string(args))))
+
+				if z == currentcoll { // create for disable duplicate in excell
+					z = " "
+				}
+				currentcoll = z // create for disable duplicate in excell
 				if *boolExcel == true {
 
 					if str_cnt == currentcnt { // create for disable duplicate in excell
@@ -297,99 +445,57 @@ func main() {
 
 					logStr := jsonToStr(string(args))
 					data = append(data, []string{dbs, currentcoll, str_cnt, logStr}) // append to csv
+
 				}
 				_ = err
-
 			}
 			_ = x
 		}
-	} else {
+	}
+}
 
-		databases, err := client.ListDatabaseNames(ctx, bson.M{})
-		if err != nil {
+func main() {
+
+	CloseHandler()
+	var dbURI, dbName, logPath, containerName string
+	var contextTimeout int
+
+	flag.StringVar(&dbURI, "db_uri", "mongodb://localhost:27017", "Set custom url to connect to mongodb")
+	flag.StringVar(&dbName, "db_name", "", "Set target database, if nil then choose all databases")
+	flag.StringVar(&logPath, "logpath", "", "Set path to log file")
+	flag.StringVar(&containerName, "container", "", "Set name of Docker container")
+	flag.IntVar(&contextTimeout, "context_timeout", 10, "Set context timeout")
+
+	boolExcel := flag.Bool("excel", false, "Add this flag if you want to put the results in an Excel file")
+	flag.Parse()
+	clientOptions := options.Client().ApplyURI(dbURI)
+	client, err := mongo.Connect(context.Background(), clientOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		if err := client.Disconnect(ctx); err != nil {
 			log.Fatal(err)
 		}
+	}()
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		log.Fatal("Connect to MongoDB is impossible. Check if it works and the entered data.")
+	}
 
-		for i, s := range databases {
-
-			col, err := client.Database(s).ListCollectionNames(ctx, bson.M{})
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			fmt.Println(Database(i, "- Database: ", s))
-			var dbs string = s // create for disable duplicate in excell
-
-			for x, z := range col {
-
-				c := client.Database(s).Collection(z)
-				duration := 10 * time.Second
-				batchSize := int32(10)
-
-				cur, err := c.Indexes().List(context.Background(), &options.ListIndexesOptions{&batchSize, &duration})
-
-				if err != nil {
-					isView := true
-					// failure to get CollectionInfo should not cause the function to exit. We only use this to
-					// determine if a collection is a view.
-					collInfo, err := GetCollectionInfo(c)
-					if collInfo != nil {
-						isView = collInfo.IsView()
-						_ = isView
-						continue
-					} else {
-						log.Fatalf("Something went wrong listing %v", err)
-					}
-
-				}
-
-				count, err := client.Database(s).Collection(z).CountDocuments(context.Background(), bson.D{})
-				cnt := int(count)
-
-				str_cnt := strconv.Itoa(cnt) // convert int to str
-
-				fmt.Println(Collections("--- Collection: ", z, " Count: ", cnt))
-
-				for cur.Next(context.Background()) {
-					index := (&bsonDocument)
-					err := cur.Decode(&index)
-					var jsonDocument map[string]interface{}
-					temporaryBytes, err = bson.MarshalExtJSON(bsonDocument, true, true)
-					err = json.Unmarshal(temporaryBytes, &jsonDocument)
-					var jsonKey map[string]interface{} = jsonDocument["key"].(map[string]interface{})
-
-					args, _ := json.Marshal(jsonKey) // marshal map[string]interface{} to str
-					fmt.Println(Index(jsonToStr(string(args))))
-
-					if z == currentcoll { // create for disable duplicate in excell
-						z = " "
-					}
-					currentcoll = z // create for disable duplicate in excell
-					if *boolExcel == true {
-
-						if str_cnt == currentcnt { // create for disable duplicate in excell
-							str_cnt = " "
-						}
-						currentcnt = str_cnt  // create for disable duplicate in excell
-						if dbs == currentdb { // create for disable duplicate in excell
-							dbs = " "
-						}
-						currentdb = dbs // create for disable duplicate in excell
-
-						logStr := jsonToStr(string(args))
-						data = append(data, []string{dbs, currentcoll, str_cnt, logStr}) // append to csv
-
-					}
-					_ = err
-				}
-				_ = x
-			}
-		}
+	if dbName != "" {
+		processSingleDB(client, ctx, dbName, boolExcel)
+	} else {
+		processAllDBs(client, ctx, boolExcel)
 	}
 	if *boolExcel == true {
 		if err := tocsvExport(data); err != nil { // this code return data to csv
 			log.Fatal(err)
 		}
 	}
-	currentlog(db_uri, logpath)
+	printCurrentInfo(client)
+	monitorLogs(logPath, containerName)
+	fmt.Println(Index("Done"))
 }

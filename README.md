@@ -1,3 +1,6 @@
+[![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg)](https://stand-with-ukraine.pp.ua)
+
+
 # Monalize tool overview 
 
 Monaliza is a tool for scanning and analyzing MongoDB database for any performance issues, which lead to high CPU consumption. 
@@ -23,11 +26,12 @@ Then you can run on any Unix like system via `./monalize`
 
 Available flags:
 
-* --db_name (optional) If you need to scan only specific database. (default: nil)
-* --db_uri (optional) Uri to connect to mongodb service. (default: "mongodb://localhost:27017")
-* --excel (optional) To save an output of the script to excel file. (default: false)
-* --logpath (optional) Specify a path to MongoDB service log file. (default "/var/log/mongodb/mongodb.log")
-* --context_timeout(optional) Set context timeout. (default 10)
+* `--db_name` (optional) If you need to scan only specific database. (default: nil)
+* `--db_uri` (optional) Uri to connect to mongodb service. (default: "mongodb://localhost:27017")
+* `--excel` (optional) To save an output of the script to excel file. (default: false)
+* `--logpath` (optional) Specify a path to MongoDB service log file. If you use this together with the variable `container` then this path to the file will be applied to the container. Without the `container` variable, it will be applied to the local log file. (default "")
+* `--container` (optional) Specify a name of Docker container. If you leave the `logpath` variable empty, logs will be read from the container. (default "")
+* `--context_timeout` (optional) Set context timeout. (default 10)
 
 A help is available via `./monalize --help`.
 

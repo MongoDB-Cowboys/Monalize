@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0
+
+### Important Notes
+
+- **Important**: Refactored codebase.
+- **Important**: Removed "Clean history" feature.
+- **Important**: Updated all Go modules.
+
+
+### Features
+
+- :tada: Added Docker support
+    - Now "Monalize" can scan logs from the default Docker log streaming or custom log files in the container.
+- Disabled shell for running the currentOp query in MongoDB. Now it's functioning with the MongoDB module.
+
+
 ## v0.0.1 (Example)
 
 ### Important Notes
