@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -17,6 +19,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -84,6 +88,26 @@ func writeToFile(filename, data string) error {
 	return nil
 }
 
+func filterPrintableASCII(data []byte) string {
+	var filteredData []byte
+	inLine := false
+
+	for _, b := range data {
+		if b == byte('\n') {
+			inLine = false
+		}
+		// Check if the byte is within the range of printable ASCII characters
+		if b >= 32 && b < 127 {
+			filteredData = append(filteredData, b)
+			inLine = true
+		} else if !inLine && b == byte('\n') {
+			filteredData = append(filteredData, b)
+		}
+	}
+
+	return string(filteredData)
+}
+
 func monitorLogs(logPath, containerName string) {
 	fmt.Println(Info("Monitoring logs mongodb..."))
 
@@ -100,7 +124,7 @@ func monitorLogs(logPath, containerName string) {
 			log.Fatalf("cmd.Run() failed with %s\n", err)
 		}
 
-		file, err = os.Create("mongo_logs.txt") // Set the file variable
+		file, err = os.Create(targetPath) // Set the file variable
 		if err != nil {
 			log.Fatalf("failed to create file: %s", err)
 		}
@@ -113,20 +137,31 @@ func monitorLogs(logPath, containerName string) {
 	} else if containerName != "" && logPath == "" {
 		fmt.Println(Info("Detected docker container usage with default stream logging."))
 
-		cmd := exec.Command("docker", "logs", containerName)
-
-		output, err := cmd.CombinedOutput()
+		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 		if err != nil {
-			log.Fatalf("cmd.Run() failed with %s\n", err)
+			log.Fatalf("Failed to create Docker client: %s", err)
 		}
 
-		file, err = os.Create("mongo_logs.txt") // Set the file variable
+		options := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: false}
+		out, err := cli.ContainerLogs(context.Background(), containerName, options)
+		if err != nil {
+			log.Fatalf("Failed to get container logs: %s", err)
+		}
+		defer out.Close()
+
+		buf := new(bytes.Buffer)
+		if _, err := io.Copy(buf, out); err != nil {
+			log.Fatalf("Failed to read container logs: %s", err)
+		}
+
+		filteredData := filterPrintableASCII(buf.Bytes())
+		file, err = os.Create(targetPath) // Set the file variable
 		if err != nil {
 			log.Fatalf("failed to create file: %s", err)
 		}
 		defer file.Close()
 
-		_, err = file.WriteString(string(output))
+		_, err = file.WriteString(string(filteredData))
 		if err != nil {
 			log.Fatalf("error writing to file: %s", err)
 		}
@@ -258,6 +293,7 @@ func jsonToStr(args string) string {
 
 	return args
 }
+
 func GetCollections(database *mongo.Database, name string) (*mongo.Cursor, error) {
 	filter := bson.D{}
 	if len(name) > 0 {
@@ -271,6 +307,7 @@ func GetCollections(database *mongo.Database, name string) (*mongo.Cursor, error
 
 	return cursor, nil
 }
+
 func GetCollectionInfo(coll *mongo.Collection) (*CollectionInfo, error) {
 	iter, err := GetCollections(coll.Database(), coll.Name())
 	if err != nil {

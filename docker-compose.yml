@@ -6,6 +6,10 @@ services:
     image: mongo:4.4
     container_name: server_mongo_for_tests
     restart: always
+    environment:
+      - MONGO_INITDB_DATABASE=monalize
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=sec#$re)t
     volumes:
       - data-tests:/data/db
     ports:
