@@ -51,14 +51,14 @@ jobs:
 
       - name: Get the upload URL
         id: get_upload_url
-        run: echo "::set-output name=upload_url::${{ steps.create-release.outputs.upload_url }}"
+        run: echo "release_upload_url=${{ steps.create-release.outputs.upload_url }}" >> $GITHUB_ENV
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.get_upload_url.outputs.upload_url }}
+          upload_url: ${{ env.release_upload_url }}
           asset_path: ./monalize
           asset_name: monalize
           asset_content_type: application/octet-stream
