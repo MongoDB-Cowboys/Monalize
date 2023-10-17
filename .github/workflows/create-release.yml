@@ -10,12 +10,18 @@ jobs:
     if: |
       contains(github.event.pull_request.title, 'release') == true &&
       github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'main'
+      github.event.pull_request.base.ref == 'master'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+        
+      - name: Build Binary
+        run: |
+          go build monalize.go
+          ls -l 
+        if: success()
         
       - name: Extract Version
         id: extract-version
@@ -42,3 +48,17 @@ jobs:
           body_path: ${{ env.changelog_file }}
           draft: false
           prerelease: false
+
+      - name: Get the upload URL
+        id: get_upload_url
+        run: echo "::set-output name=upload_url::${{ steps.create-release.outputs.upload_url }}"
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.get_upload_url.outputs.upload_url }}
+          asset_path: ./monalize
+          asset_name: monalize
+          asset_content_type: application/octet-stream
