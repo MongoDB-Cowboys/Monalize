@@ -7,7 +7,7 @@
 - **Important**: Refactored codebase.
 - **Important**: Removed "Clean history" feature.
 - **Important**: Updated all Go modules.
-
+- **Important**: Added new `container` flag.
 
 ### Features
 
