@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+### Important Notes
+
+- **Important**: Changed the project structure to improve readability and convenience.
+
 ## 1.2.0
 
 ### Important Notes
