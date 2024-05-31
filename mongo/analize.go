@@ -15,11 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// var jsonDocuments []map[string]interface{}
-// var byteDocuments []byte
 var bsonDocument bson.D
-
-// var jsonDocument map[string]interface{}
 var temporaryBytes []byte
 
 func (ci *CollectionInfo) IsView() bool {
