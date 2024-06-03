@@ -46,14 +46,6 @@ func MonitorLogs(logPath, containerName string, usePodman *bool, dockerSocketPat
 		}
 	} else if containerName != "" && logPath == "" {
 		fmt.Println(Info("Detected docker container usage with default stream logging."))
-		// defaultDockerSocketPath := "unix:///var/run/docker.sock"
-
-		// dockerSocketPath := defaultDockerSocketPath
-		// if customDockerSocketPath != "" {
-		// 	dockerSocketPath = customDockerSocketPath
-		// }
-		fmt.Println(dockerSocketPath)
-		// fmt.Println(customDockerSocketPath)
 		cli, err := client.NewClientWithOpts(
 			client.WithHost(dockerSocketPath),
 			client.FromEnv,
