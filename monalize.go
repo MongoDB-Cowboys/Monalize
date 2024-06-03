@@ -40,16 +40,18 @@ var data = [][]string{}
 func main() {
 
 	CloseHandler()
-	var dbURI, dbName, logPath, containerName string
+	var dbURI, dbName, logPath, containerName, customSocketPath string
 	var contextTimeout int
 
 	flag.StringVar(&dbURI, "db_uri", "mongodb://localhost:27017", "Set custom url to connect to mongodb")
 	flag.StringVar(&dbName, "db_name", "", "Set target database, if nil then choose all databases")
 	flag.StringVar(&logPath, "logpath", "", "Set path to log file")
 	flag.StringVar(&containerName, "container", "", "Set name of Docker container")
+	flag.StringVar(&customSocketPath, "socket", "unix:///var/run/docker.sock", "Set path to containerization socket")
 	flag.IntVar(&contextTimeout, "context_timeout", 10, "Set context timeout")
 
 	boolExcel := flag.Bool("excel", false, "Add this flag if you want to put the results in an Excel file")
+	usePodman := flag.Bool("podman", false, "Add this flag if you are using podman and want to scan custom log file in container")
 	flag.Parse()
 	clientOptions := options.Client().ApplyURI(dbURI)
 	client, err := mongo.Connect(context.Background(), clientOptions)
@@ -79,6 +81,6 @@ func main() {
 		}
 	}
 	mongodb.PrintCurrentInfo(client)
-	utils.MonitorLogs(logPath, containerName)
+	utils.MonitorLogs(logPath, containerName, usePodman, customSocketPath)
 	fmt.Println(utils.Index("Done"))
 }

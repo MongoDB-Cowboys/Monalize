@@ -15,16 +15,19 @@ import (
 	"github.com/docker/docker/client"
 )
 
-func MonitorLogs(logPath, containerName string) {
+func MonitorLogs(logPath, containerName string, usePodman *bool, dockerSocketPath string) {
 	fmt.Println(Info("Monitoring logs mongodb..."))
-
+	var cmd *exec.Cmd
 	var file *os.File
 	var err error
 	targetPath := "mongo_logs.txt"
 	if containerName != "" && logPath != "" {
 		fmt.Println(Info("Detected docker container usage with custom path to log file."))
-
-		cmd := exec.Command("docker", "exec", containerName, "cat", logPath)
+		if *usePodman {
+			cmd = exec.Command("podman", "exec", containerName, "cat", logPath)
+		} else {
+			cmd = exec.Command("docker", "exec", containerName, "cat", logPath)
+		}
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -43,12 +46,22 @@ func MonitorLogs(logPath, containerName string) {
 		}
 	} else if containerName != "" && logPath == "" {
 		fmt.Println(Info("Detected docker container usage with default stream logging."))
+		// defaultDockerSocketPath := "unix:///var/run/docker.sock"
 
-		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		// dockerSocketPath := defaultDockerSocketPath
+		// if customDockerSocketPath != "" {
+		// 	dockerSocketPath = customDockerSocketPath
+		// }
+		fmt.Println(dockerSocketPath)
+		// fmt.Println(customDockerSocketPath)
+		cli, err := client.NewClientWithOpts(
+			client.WithHost(dockerSocketPath),
+			client.FromEnv,
+			client.WithAPIVersionNegotiation(),
+		)
 		if err != nil {
-			log.Fatalf("Failed to create Docker client: %s", err)
+			log.Fatalf("Failed to create containerization client: %s", err)
 		}
-
 		options := types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: false}
 		out, err := cli.ContainerLogs(context.Background(), containerName, options)
 		if err != nil {
