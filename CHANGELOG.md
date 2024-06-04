@@ -5,6 +5,9 @@
 ### Important Notes
 
 - **Important**: Changed the project structure to improve readability and convenience.
+- **Important**: Updated all Go modules.
+- **Important**: Added new `podman` flag.
+
 ### Features
 
 - Added Podman support
