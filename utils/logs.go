@@ -15,16 +15,21 @@ import (
 	"github.com/docker/docker/client"
 )
 
-func MonitorLogs(logPath, containerName string) {
+func MonitorLogs(logPath, containerName string, podman *bool) {
 	fmt.Println(Info("Monitoring logs mongodb..."))
 
 	var file *os.File
 	var err error
+	var cmd *exec.Cmd
 	targetPath := "mongo_logs.txt"
 	if containerName != "" && logPath != "" {
 		fmt.Println(Info("Detected docker container usage with custom path to log file."))
-
-		cmd := exec.Command("docker", "exec", containerName, "cat", logPath)
+		fmt.Println(podman)
+		if *podman {
+			cmd = exec.Command("podman", "exec", containerName, "cat", logPath)
+		} else {
+			cmd = exec.Command("docker", "exec", containerName, "cat", logPath)
+		}
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {

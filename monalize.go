@@ -50,6 +50,7 @@ func main() {
 	flag.IntVar(&contextTimeout, "context_timeout", 10, "Set context timeout")
 
 	boolExcel := flag.Bool("excel", false, "Add this flag if you want to put the results in an Excel file")
+	boolPodman := flag.Bool("podman", false, "Add this flag if you are using podman with custom logfile in container")
 	flag.Parse()
 	clientOptions := options.Client().ApplyURI(dbURI)
 	client, err := mongo.Connect(context.Background(), clientOptions)
@@ -79,6 +80,6 @@ func main() {
 		}
 	}
 	mongodb.PrintCurrentInfo(client)
-	utils.MonitorLogs(logPath, containerName)
+	utils.MonitorLogs(logPath, containerName, boolPodman)
 	fmt.Println(utils.Index("Done"))
 }

@@ -5,6 +5,9 @@
 ### Important Notes
 
 - **Important**: Changed the project structure to improve readability and convenience.
+### Features
+
+- Added Podman support
 
 ## 1.2.0
 
