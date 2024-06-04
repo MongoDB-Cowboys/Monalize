@@ -24,7 +24,6 @@ func MonitorLogs(logPath, containerName string, podman *bool) {
 	targetPath := "mongo_logs.txt"
 	if containerName != "" && logPath != "" {
 		fmt.Println(Info("Detected docker container usage with custom path to log file."))
-		fmt.Println(podman)
 		if *podman {
 			cmd = exec.Command("podman", "exec", containerName, "cat", logPath)
 		} else {

@@ -50,13 +50,13 @@ After successfull run of the `monalize` tool, all the output artifacts will be s
 * `result.csv` optional excel file.
 
 ## Podman
-For running "Monalize" when MongoDB is working in Podman, you should set the `DOCKER_HOST` variable with the path to the `podman.socket` file and add the additional flag `--podman true` for using the Podman executable file to check the log file in the container. This flag is required only when you want to check a specific log file in the container.
+For running `Monalize` when `MongoDB` is working in `Podman`, you should set the `DOCKER_HOST` variable with the path to the `podman.socket` file and add the additional flag `--podman=true` for using the `Podman` executable file to check the log file in the container. This flag is required only when you want to check a specific log file in the container.
 
 Example:
 
 ```
 export DOCKER_HOST=unix:///Users/username/.local/share/containers/podman/machine/podman.sock
-monalize --db_uri "mongodb://127.0.0.1:27017"  --container mongo --db_name cb_admin_prod --logpath "/tmp/log" --excel true --podman true
+monalize --db_uri "mongodb://127.0.0.1:27017"  --container mongo --db_name example --logpath "/tmp/log" --excel=true --podman=true
 ```
 ## License 
 
