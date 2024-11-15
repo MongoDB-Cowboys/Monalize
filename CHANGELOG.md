@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2
+
+- Update golang docker module
+
 ## 1.2.1
 
 ### Important Notes
