@@ -2,3 +2,4 @@ monalize
 colout.txt
 result.csv
 mongod.log
+.DS_Store
