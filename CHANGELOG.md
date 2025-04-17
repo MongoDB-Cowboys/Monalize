@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.3
+
+Fix dependabot alerts:
+
+- golang.org/x/crypto Vulnerable to Denial of Service (DoS) via Slow or Incomplete Key Exchange
+
+- Misuse of ServerConfig.PublicKeyCallback may cause authorization bypass in golang.org/x/crypto 
+
+- golang.org/x/net vulnerable to Cross-site Scripting 
+
+- HTTP Proxy bypass using IPv6 Zone IDs in golang.org/x/net 
+
 ## 1.2.2
 
 - Update golang docker module
